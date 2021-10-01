@@ -8,6 +8,6 @@ done
 printf "Creating database \n"
 psql -v ON_ERROR_STOP=1 "$POSTGRES_URI" -f ./create-db.sql
 
-migrate -source file://./migrations -database "$DATABASE_URI" up
+migrate -source file://./migrations -database "$POSTGRES_URI_WITH_DB" up
 
 go run cmd/api/main.go
