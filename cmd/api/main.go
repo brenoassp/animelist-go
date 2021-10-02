@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"os"
 
+	_ "github.com/lib/pq"
+
+	"github.com/brenoassp/animelist-go/domain/anime"
 	"github.com/brenoassp/animelist-go/infra/env"
 	"github.com/fasthttp/router"
 	"github.com/valyala/fasthttp"
@@ -24,7 +27,7 @@ func main() {
 		postgresMaxOpenConnections: env.GetInt("POSTGRES_MAX_OPEN_CONNECTIONS", 5),
 	}
 
-	db, err := ksql.New("postgres", conf.postgresURIWithDB, ksql.Config{
+	_, err := ksql.New("postgres", conf.postgresURIWithDB, ksql.Config{
 		MaxOpenConns: conf.postgresMaxOpenConnections,
 	})
 	if err != nil {
@@ -37,7 +40,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	animeService := anime.NewService()
+	animeController := anime.NewController(animeService)
+
 	r := router.New()
+	animeGroup := r.Group("/anime")
+	animeGroup.POST("", animeController.Create)
+
 	r.GET("/", func(ctx *fasthttp.RequestCtx) {
 		fmt.Printf("Hello, world! Requested path is %q", ctx.Path())
 	})
