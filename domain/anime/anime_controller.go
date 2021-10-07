@@ -2,9 +2,10 @@ package anime
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/brenoassp/animelist-go/domain"
-	"github.com/valyala/fasthttp"
+	atreugo "github.com/savsgio/atreugo/v11"
 )
 
 type Controller struct {
@@ -17,7 +18,7 @@ func NewController(animeService domain.AnimeService) Controller {
 	}
 }
 
-func (c Controller) Create(ctx *fasthttp.RequestCtx) {
+func (c Controller) Create(ctx *atreugo.RequestCtx) error {
 	var input struct {
 		Name        string  `json:"name"`
 		Description *string `json:"description"`
@@ -27,6 +28,7 @@ func (c Controller) Create(ctx *fasthttp.RequestCtx) {
 	err := json.Unmarshal(ctx.PostBody(), &input)
 	if err != nil {
 		// return json with validation error
+		ctx.SetUserValue("error", fmt.Errorf("error unmarshaling body from request to create new anime"))
 	}
-
+	return nil
 }

@@ -3,17 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
 	_ "github.com/lib/pq"
 
+	"github.com/brenoassp/animelist-go/domain"
 	"github.com/brenoassp/animelist-go/domain/anime"
 	"github.com/brenoassp/animelist-go/infra/env"
-	"github.com/fasthttp/router"
-	"github.com/valyala/fasthttp"
 	"github.com/vingarcia/ksql"
+
+	atreugo "github.com/savsgio/atreugo/v11"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 		postgresMaxOpenConnections: env.GetInt("POSTGRES_MAX_OPEN_CONNECTIONS", 5),
 	}
 
-	_, err := ksql.New("postgres", conf.postgresURIWithDB, ksql.Config{
+	db, err := ksql.New("postgres", conf.postgresURIWithDB, ksql.Config{
 		MaxOpenConns: conf.postgresMaxOpenConnections,
 	})
 	if err != nil {
@@ -40,36 +40,72 @@ func main() {
 		os.Exit(1)
 	}
 
-	animeService := anime.NewService()
+	animeService := anime.NewService(db)
 	animeController := anime.NewController(animeService)
 
-	r := router.New()
-	animeGroup := r.Group("/anime")
-	animeGroup.POST("", animeController.Create)
+	server := atreugo.New(atreugo.Config{
+		Addr: "127.0.0.1:8090",
+	})
+	server.UseAfter(handleErrors)
 
-	r.GET("/", func(ctx *fasthttp.RequestCtx) {
-		fmt.Printf("Hello, world! Requested path is %q", ctx.Path())
+	server.GET("/", func(ctx *atreugo.RequestCtx) error {
+		return ctx.TextResponse("Hello World")
 	})
 
-	r.NotFound = func(ctx *fasthttp.RequestCtx) {
-		response := struct {
-			Message string
-		}{
-			Message: "Invalid route",
-		}
+	animeGroup := server.NewGroupPath("/anime")
+	animeGroup.POST("", func(ctx *atreugo.RequestCtx) error {
+		return animeController.Create(ctx)
+	})
 
-		responseJSON, err := json.Marshal(response)
-		if err != nil {
-			fmt.Println("Error marshalling route not found response")
-			os.Exit(1)
-		}
+	if err := server.ListenAndServe(); err != nil {
+		panic(err)
+	}
+}
 
-		ctx.SetStatusCode(http.StatusNotFound)
-		ctx.SetContentType("application/json")
-		ctx.SetBody(responseJSON)
+func handleErrors(ctx *atreugo.RequestCtx) error {
+	ctxErr := ctx.UserValue("error")
+	if ctxErr == nil {
+		return ctx.Next()
 	}
 
-	if err := fasthttp.ListenAndServe("127.0.0.1:8090", r.Handler); err != nil {
-		log.Fatalf("error in ListenAndServe: %s", err)
+	domainErr, ok := ctxErr.(domain.DomainErr)
+	if !ok {
+		// gera log de erro
+		genericError(ctx)
+		return nil
 	}
+
+	httpStatus := http.StatusInternalServerError
+
+	switch domainErr.Code {
+	case "BadRequestErr":
+		httpStatus = http.StatusBadRequest
+	case "NotFoundErr":
+		httpStatus = http.StatusNotFound
+	}
+
+	errData, err := json.Marshal(domainErr.Data)
+	if err != nil {
+		// gera log de erro
+		genericError(ctx)
+		return nil
+	}
+
+	ctx.SetStatusCode(httpStatus)
+	ctx.SetBody(errData)
+	return ctx.Next()
+}
+
+func genericError(ctx *atreugo.RequestCtx) {
+	output := struct {
+		Error string `json:"error"`
+	}{
+		Error: "internal error",
+	}
+	outputJSON, err := json.Marshal(output)
+	if err != nil {
+		// gera log de erro
+	}
+	ctx.SetStatusCode(http.StatusInternalServerError)
+	ctx.SetBody(outputJSON)
 }
