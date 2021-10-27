@@ -14,3 +14,7 @@ func NewNotFoundErr(title string, data map[string]interface{}) error {
 func NewBadRequestErr(title string, data map[string]interface{}) error {
 	return DomainErr{Code: "BadRequestErr", Title: title, Data: data}
 }
+
+func NewDatabaseErr(title string, data map[string]interface{}) error {
+	return DomainErr{Code: "DatabaseErr", Title: title, Data: data}
+}

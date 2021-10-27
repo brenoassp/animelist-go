@@ -4,5 +4,6 @@ import "context"
 
 // AnimeService ...
 type AnimeService interface {
-	Create(ctx context.Context) error
+	Create(ctx context.Context, anime Anime) error
+	Update(ctx context.Context, anime Anime) error
 }

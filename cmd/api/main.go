@@ -54,7 +54,12 @@ func main() {
 
 	animeGroup := server.NewGroupPath("/anime")
 	animeGroup.POST("", func(ctx *atreugo.RequestCtx) error {
-		return animeController.Create(ctx)
+		animeController.Create(ctx)
+		return nil
+	})
+	animeGroup.PUT("/{id}", func(ctx *atreugo.RequestCtx) error {
+		animeController.Update(ctx)
+		return nil
 	})
 
 	if err := server.ListenAndServe(); err != nil {
@@ -71,6 +76,7 @@ func handleErrors(ctx *atreugo.RequestCtx) error {
 	domainErr, ok := ctxErr.(domain.DomainErr)
 	if !ok {
 		// gera log de erro
+		fmt.Printf("Error trying to make type assertion from interface to domain error: %v\n", ctxErr)
 		genericError(ctx)
 		return nil
 	}
@@ -87,6 +93,7 @@ func handleErrors(ctx *atreugo.RequestCtx) error {
 	errData, err := json.Marshal(domainErr.Data)
 	if err != nil {
 		// gera log de erro
+		fmt.Printf("Error marshalling domain error data: %v\n", domainErr.Data)
 		genericError(ctx)
 		return nil
 	}
@@ -105,6 +112,7 @@ func genericError(ctx *atreugo.RequestCtx) {
 	outputJSON, err := json.Marshal(output)
 	if err != nil {
 		// gera log de erro
+		fmt.Printf("Error marshalling json output: %v\n", output)
 	}
 	ctx.SetStatusCode(http.StatusInternalServerError)
 	ctx.SetBody(outputJSON)
